@@ -1,0 +1,165 @@
+---
+- name: Ubuntu Provision to Setup Nginx and Host @TechLab Service
+  hosts: all
+  become: true
+  tasks:
+    - name: Updating Repo
+      apt:
+        update_cache: yes
+
+    - name: Install git
+      apt:
+        name: git
+        state: present
+
+    - name: Install curl
+      apt:
+        name: curl
+        state: present
+
+    - name: Install Nginx
+      apt:
+        name: nginx
+        state: present
+      notify: Restart Nginx
+
+    - name: Install MySQL
+      apt:
+        name: mysql-client
+        state: present
+
+    - name: Install php7
+      apt:
+        name: ['php', 'php-fpm', 'libapache2-mod-php', 'php-mysql', 'php7.2-cli', 'php7.2-curl', 'php7.2-gd', 'php7.2-mbstring', 'php7.2-mysql', 'php7.2-xml']
+        state: present
+
+    - name: Clone git repo
+      git: 
+        repo: https://github.com/csuntechlab/affinity.git
+        clone: yes
+        dest: /var/www/html/affinity
+
+    - name: Change permissions to nginx group (www-data)
+      file: 
+        path: /var/www/html/affinity
+        owner: www-data
+        group: www-data
+        recurse: yes
+        follow: yes
+
+    - name: Create symlink in the public directory inside the affinity dir
+      file:
+        src: /var/www/html/affinity/public
+        dest: /var/www/html/public
+        state: link
+
+    - name: Change doc root
+      lineinfile:
+        path: /etc/nginx/sites-enabled/default
+        regexp: 'root /var/www/html;'
+        line: "root /var/www/html/public;"
+        state: present
+        backup: no
+
+     #- name: Edit conf file
+      # lineinfile:
+       #  path: /etc/nginx/sites-enabled/default
+        # regexp: ''
+         #line: ""
+        # state: present
+         #backup: no
+    
+    - name: Download composer pkg using get_url and put in $HOME temporarily
+      get_url: 
+        url: https://getcomposer.org/installer 
+        dest: /home/ubuntu/composer.phar
+        mode: 644
+ 
+    - name: Install composer using php
+      command: "php -d allow_url_fopen=1 /home/ubuntu/composer.phar"
+
+    - name: Ensure directory exists for system wide installation
+      file: 
+        path: /usr/local/bin
+        owner: root
+        group: root 
+        state: directory
+
+    - name: Make composer available system wide
+      command: "mv /home/ubuntu/composer.phar /usr/local/bin/composer"
+
+     # Run composer install inside affinity dir
+    - composer:
+        command: install
+        working_dir: /var/www/html/affinity
+
+    # Nginx config
+   # - name: Sets Nginx conf file
+    #  template:
+     #   src: "files/nginx.conf.j2"
+      #  dest: "/etc/nginx/sites-available/ubuntu.conf"
+
+    #- name: Enables new site
+     # file:
+      #  src: "/etc/nginx/sites-available/ubuntu.conf"
+       # dest: "/etc/nginx/sites-enabled/ubunut.conf"
+        #state: link
+     # notify: Reload Nginx
+
+    #- name: Removes "default" site
+     # file:
+      #  path: "/etc/nginx/sites-enabled/default"
+       # state: absent
+     # notify: Reload Nginx
+
+    - name: nginx listen 8080 default_server
+      lineinfile:
+        path: /etc/nginx/sites-enabled/default
+        # Search for String
+        regexp: 'listen 80 default_server\;'
+        line: "listen 8080 default_server;"
+        state: present
+        backup: no
+   
+    - name: nginx listen 8080 default_server line 2
+      lineinfile:
+        path: /etc/nginx/sites-enabled/default
+        # Search for String 2
+        regexp: 'listen \[\:\:\]\:80 default_server;'
+        line: "listen [::]:8080 default_server;"
+        state: present
+    
+    - name: Add index.php to sites enabled
+      lineinfile:
+        path: /etc/nginx/sites-enabled/default
+        regexp: 'index index.html index.htm index.nginx-debian.html;'
+        line: "index index.php index.html index.htm index.nginx-debian.html;"
+        state: present
+
+    #- name: Sets Up PHP Info Page
+     # template:
+      #  src: "files/info.php.j2"
+       # dest: "/var/www/html/index.php"
+    
+    - name: Config php
+      blockinfile:
+        path: /etc/nginx/sites-enabled/default
+        insertafter: "server_name _;"
+        block: |
+          location ~ \.php$ {
+            include snippets/fastcgi-php.conf;
+            fastcgi_pass unix:/var/run/php/php7.2-fpm.sock;
+          }
+      notify: Restart Nginx
+
+  handlers: 
+  - name: Reload Nginx
+    service:
+      name: nginx
+      state: reloaded
+
+  - name: Restart Nginx
+    service:
+      name: nginx
+      state: restarted
+...

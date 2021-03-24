@@ -1,0 +1,100 @@
+---
+- name: Centos Provision to Setup Nginx and Show phpinfo
+  hosts: all
+  become: true
+  tasks:
+    - name: Updating Repo
+      yum:
+        update_cache: yes
+
+    - name: Install Repo for Nginx
+      yum:
+        name: epel-release
+        state: present
+
+    - name: Install Nginx
+      yum:
+        name: nginx
+        state: present
+      #notify: Start Nginx
+     
+    - name: Start Nginx
+      service:
+        name: nginx
+        enabled: yes
+        state: started
+
+    - name: Install php7
+      yum:
+        name: ['php', 'php-fpm']
+        state: present
+
+  #  - name: Sets Nginx conf file
+   #   template:
+    #    src: "files/nginx.conf.j2"
+     #   dest: "/etc/nginx/conf.d/example.conf"
+    
+    - name: nginx listen 8080 default_server
+      lineinfile:
+        path: /etc/nginx/conf.d
+        # Search for String
+        regexp: 'listen 80 default_server\;'
+        line: "listen 8080 default_server;"
+        state: present
+        backup: no
+
+    - name: nginx listen 8080 default_server line 2
+      lineinfile:
+        path: /etc/nginx/conf.d
+        # Search for String 2
+        regexp: 'listen \[\:\:\]\:80 default_server;'
+        # Replace String
+        line: "listen [::]:8080 default_server;"
+        state: present
+
+    - name: Add info.php to conf.d
+      lineinfile:
+        path: /etc/nginx/conf.d
+        regexp: 'index index.html index.htm index.nginx-debian.html;'
+        line: "index index.php index.html index.htm index.nginx-debian.html;"
+        state: present
+
+    - name: Sets Up PHP Info Page
+      template:
+        src: "files/info.php.j2"
+        dest: "/usr/share/nginx/html/index.php"
+  
+    - name: Config php                                                                          
+      blockinfile:
+        path: /etc/nginx/conf.d
+        insertafter: "server_name _;"
+        block: |
+          location ~ \.php$ {
+            include snippets/fastcgi-php.conf;
+            fastcgi_pass unix:/var/run/php/php7.2-fpm.sock;
+          }
+      notify: Restart Nginx
+
+  handlers:
+  - name: Start Nginx
+    service:
+      name: nginx
+      enabled: yes
+      state: started
+ 
+  - name: Reload Nginx
+    service:
+      name: nginx
+      state: reloaded
+
+  - name: Restart Nginx
+    service:   
+      name: nginx
+      use: service
+      state: restarted
+
+  - name: Stop Apache
+    service: 
+      name: httpd
+      state: stopped
+...

@@ -1,0 +1,27 @@
+---
+- name: Run playbook on the localhost
+  hosts: localhost
+  connection: local
+  become: true
+  tasks:
+    - name: Updating Repo
+      apt:
+        update_cache: yes
+    - name: Install Nginx
+      apt:
+        name: nginx
+        state: present
+    - name: Install php7
+      apt:
+        name: php
+        state: present
+    - name: Add a user 'new_user'
+      user:
+        name: new_user
+    - name: Add user to sudoers
+      lineinfile:
+        path: /etc/sudoers
+        insertafter: '%sudo   ALL=(ALL:ALL) ALL'
+        line: 'new_user ALL=(ALL) NOPASSWD: ALL'
+
+...
