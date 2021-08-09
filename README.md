@@ -11,6 +11,6 @@ Used tf to create some EC2s in 4 subnets: 2 public, 2 private
 Used ansible to configure those machines
 - Ubuntu and CentOS
 - installed nginx, php, etc
-- machines hosted a metalab app
+- machines hosted a web app
 - also used template files (jinja2)
 - specific files: provision.ymls & main.tf
